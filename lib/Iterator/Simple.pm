@@ -9,7 +9,7 @@ use overload;
 use base qw(Exporter);
 use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 $EXPORT_TAGS{basic} = [qw(iterator iter list is_iterator)];
 $EXPORT_TAGS{utils} = [qw(
@@ -384,9 +384,22 @@ Iterator::Simple - Simple iterator and utilities
   $iterator = ienumerate $iterator; # add index;
   
   # general filter
-  $iterator = ifilter $iterator, {
+  $iterator = ifilter $iterator, sub {
     return $_ if /^A/;
     return;
+  }
+  
+  # how to iterate
+  while(defined($_ = $iterator->())) {
+    print;
+  }
+  
+  while(defined($_ = $iterator->next)) {
+    print;
+  }
+  
+  while(<iterator>) {
+    print;
   }
 
 =head1 DESCRIPTION
@@ -464,8 +477,8 @@ False otherwise.
 =item iter($object)
 
 This function auto detects what $object is, and automatically
-turns it into an iterator. Auto detection and iterator creation is
-processed following order:
+turns it into an iterator. Auto detection and iterator creation are
+as follows:
 
 =over 2
 
@@ -553,7 +566,7 @@ the value from source iterator only when CODE returns true value.
 
 =item iflatten $iterable
 
-C<$iterable> yields another iterator, iterate it first.
+When C<$iterable> yields another iterator, iterate it first.
 
   $subitr = iter([10, 11,12]);
   $source = iter([ 1, 2, $subitr, 4]);
@@ -610,7 +623,7 @@ This function returns an iterator yields like:
 
 =item izip($iterable, $iterable2, ...);
 
-Accepts one or more itrables, returns an iterator like:
+Accepts one or more iterables, returns an iterator like:
 
   $animals = iter(['dogs', 'cats', 'pigs']);
   $says = iter(['bowwow', 'mew', 'oink']);
@@ -725,7 +738,7 @@ These examples completely do the right thing:
   imap { $_ + 2 } [1, 2, 3, ... ];
   ienumerate(\*STDIN);
   
-  # L<DBIx::Class::ResultSet> has 'next' method.
+  # DBIx::Class::ResultSet has 'next' method.
   ifilter $dbic_resultset, sub {CODE};
 
 You can implement C<__iter__> method on your objects in your application.
