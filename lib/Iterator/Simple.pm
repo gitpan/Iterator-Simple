@@ -9,7 +9,7 @@ use overload;
 use base qw(Exporter);
 use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION = '0.02';
+$VERSION = '0.03';
 
 $EXPORT_TAGS{basic} = [qw(iterator iter list is_iterator)];
 $EXPORT_TAGS{utils} = [qw(
@@ -220,7 +220,7 @@ sub ichain {
 }
 
 # name: ienumerate
-# sysopsis: ienumrate($iterable);
+# sysopsis: ienumerate($iterable);
 # description:
 #   returns an iterator which yields $souce value with its index.
 # param: iterable: source iterator
@@ -611,13 +611,13 @@ Example:
   
   # yields 'foo', 'bar', 'baz', 'hoge', 'hage'.
 
-=item ienumrate($iterable)
+=item ienumerate($iterable)
 
 This function returns an iterator yields like:
 
   $ary = iter(['foo', 'bar', 'baz', ... ]);
   
-  $iter = ienumrate $ary;
+  $iter = ienumerate $ary;
   
   # yields [0, 'foo'], [1, 'bar'], [2, 'baz'], ... 
 

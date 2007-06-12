@@ -1,5 +1,8 @@
 Revision history for Perl extension Iterator::Simple
 
+0.03  Tue Jun 12 09:44:12 2007
+    - Documentation fix
+
 0.02  Tue Jun 12 09:31:50 2007
     - Several documentation fix
 
