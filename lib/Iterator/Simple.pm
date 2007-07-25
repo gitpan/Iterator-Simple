@@ -3,24 +3,26 @@ package Iterator::Simple;
 use strict;
 
 use Carp;
-use UNIVERSAL qw(isa can);
-use Scalar::Util qw(reftype);
+use UNIVERSAL qw(isa);
+use Scalar::Util qw(blessed reftype);
 use overload;
 use base qw(Exporter);
 use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS);
 
-$VERSION = '0.03';
+use constant ITERATOR_CLASS => 'Iterator::Simple::Iterator';
+$VERSION = '0.04';
 
 $EXPORT_TAGS{basic} = [qw(iterator iter list is_iterator)];
 $EXPORT_TAGS{utils} = [qw(
 	ifilter iflatten ichain izip ienumerate
 	islice ihead iskip imap igrep iarray
+	is_iterable is_listable
 )];
 
 push @EXPORT_OK, @{$EXPORT_TAGS{basic}}, @{$EXPORT_TAGS{utils}};
 $EXPORT_TAGS{all} = [@EXPORT_OK];
 
-sub iterator(&) { Iterator::Simple::Iterator->new($_[0]);}
+sub iterator(&) { ITERATOR_CLASS->new($_[0]);}
 
 # name: iter
 # synopsis: iter($object);
@@ -29,28 +31,62 @@ sub iterator(&) { Iterator::Simple::Iterator->new($_[0]);}
 # param: object: object to turn into iterator
 # return: iterator
 sub iter {
+	if(not @_) {
+		return iterator { return };
+	}
 	my($self) = @_;
-	if(isa $self, 'Iterator::Simple::Iterator') {
-		return $self;
-	}
-	my $method;
-	if($method = can $self, '__iter__') {
-		return $method->($self);
-	}
-	if($method = overload::Method($self, '<>') || can($self, 'next') ) {
-		return Iterator::Simple::Iterator->new(sub { $method->($self) });
+	if(blessed $self) {
+		if($self->isa(ITERATOR_CLASS)) {
+			return $self;
+		}
+		my $method;
+		if($method = $self->can('__iter__')) {
+			return $method->($self);
+		}
+		if($method = overload::Method($self, '<>') || $self->can('next')) {
+			return ITERATOR_CLASS->new(sub { $method->($self) });
+		}
+		if($method = overload::Method($self, '&{}')) {
+			return ITERATOR_CLASS->new($method->($self));
+		}
+		if($method = overload::Method($self,'@{}')) {
+			return iarray($method->($self));
+		}
 	}
 	if(ref($self) eq 'ARRAY') {
 		return iarray($self);
 	}
 	if(ref($self) eq 'CODE') {
-		return Iterator::Simple::Iterator->new($self);
+		return ITERATOR_CLASS->new($self);
 	}
 	if(reftype($self) eq 'GLOB') {
-		return Iterator::Simple::Iterator->new(sub { scalar <$self> });
+		return ITERATOR_CLASS->new(sub { scalar <$self> });
 	}
 
 	croak sprintf "'%s' object is not iterable", (ref($self)||'SCALAR');
+}
+
+# name: is_iterable
+# synopsis: iter($object);
+# description:
+#   returns given object is iterable or not.
+# param: object
+# return: iterator
+sub is_iterable {
+	my($self) = @_;
+	return not not (
+		(blessed($self) and (
+			$self->isa(ITERATOR_CLASS)
+			or $self->can('__iter__')
+			or $self->can('next')
+			or overload::Method($self, '<>')
+			or overload::Method($self, '&{}')
+			or overload::Method($self,'@{}')
+		))
+		or ref($self) eq 'ARRAY'
+		or ref($self) eq 'CODE'
+		or reftype($self) eq 'GLOB'
+	);
 }
 
 # name: is_iterator
@@ -60,7 +96,7 @@ sub iter {
 # param: object: some object;
 # return: bool
 sub is_iterator {
-	isa $_[0], 'Iterator::Simple::Iterator';
+	blessed($_[0]) and $_[0]->isa(ITERATOR_CLASS);
 }
 
 # name: list
@@ -70,32 +106,37 @@ sub is_iterator {
 # param: object: object to turn into array
 # return: array reference
 sub list {
-	my($self) = @_;
-	if(isa $self, 'Iterator::Simple::Iterator') {
-		my(@list, $val);
-		push @list, $val while defined($val = $self->());
-		return \@list;
+	if(not @_) {
+		return [];
 	}
+	my($self) = @_;
 	if(ref($self) eq 'ARRAY') {
 		return $self;
 	}
 	if(reftype($self) eq 'GLOB') {
 		return [<$self>];
 	}
-	my $method;
-	if($method = overload::Method($self,'@{}')) {
-		return $method->($self);
-	}
-	if($method = can($self, '__iter__')) {
-		my $iter = $method->($self);
-		my(@list, $val);
-		push @list, $val while defined($val = $iter->());
-		return \@list;
-	}
-	if($method = overload::Method($self, '<>') || can($self, 'next')) {
-		my(@list, $val);
-		push @list, $val while defined($val = $method->($self));
-		return \@list;
+	if(blessed $self) {
+		if($self->isa(ITERATOR_CLASS)) {
+			my(@list, $val);
+			push @list, $val while defined($val = $self->());
+			return \@list;
+		}
+		my $method;
+		if($method = overload::Method($self,'@{}')) {
+			return $method->($self);
+		}
+		if($method = $self->can('__iter__')) {
+			my(@list, $val);
+			my $iter = $method->($self);
+			push @list, $val while defined($val = $iter->());
+			return \@list;
+		}
+		if($method = overload::Method($self, '<>') || $self->can('next')) {
+			my(@list, $val);
+			push @list, $val while defined($val = $method->($self));
+			return \@list;
+		}
 	}
 	croak sprintf "'%s' object could not be converted to array ref", (ref($self)||'SCALAR');
 }
@@ -124,10 +165,9 @@ sub ifilter {
 			return $rv if defined($rv = $buf->());
 			undef $buf;
 		}
-		local $_;
-		while(defined($_ = $src->())) {
+		while(defined(local $_ = $src->())) {
 			next unless defined($rv = $code->());
-			return $rv unless isa $rv, 'Iterator::Simple::Iterator'; 
+			return $rv unless isa $rv, ITERATOR_CLASS; 
 			$buf = $rv;
 			return $rv if defined($rv = $buf->());
 			undef $buf;
@@ -147,7 +187,8 @@ sub imap(&$) {
 	my($code, $src) = @_;
 	$src = iter($src);
 	ref($src)->new(sub {
-		return unless defined(local $_ = $src->());
+		local $_ = $src->();
+		return if not defined $_;
 		return $code->();
 	});
 }
@@ -190,7 +231,8 @@ sub iflatten {
 		}
 		while(1){
 			$rv = $src->();
-			return $rv unless isa $rv, 'Iterator::Simple::Iterator'; 
+			return if not defined $rv;
+			return $rv unless isa $rv, ITERATOR_CLASS; 
 			$buf = $rv;
 			return $rv if defined($rv = $buf->());
 			undef $buf;
@@ -231,7 +273,8 @@ sub ienumerate {
 	my $idx = 0;
 	
 	ref($src)->new(sub{
-		return unless defined(my $rv = $src->());
+		my $rv = $src->();
+		return if not defined $rv;
 		return [$idx++, $rv];
 	});
 }
@@ -250,7 +293,7 @@ sub izip {
 		my @rv;
 		for my $src (@srcs) {
 			my $rv = $src->();
-			return unless defined $rv;
+			return if not defined $rv;
 			push @rv, $rv;
 		}
 		return \@rv;
@@ -309,12 +352,11 @@ sub iarray {
 		croak 'Argument to iarray must be ARRAY reference';
 	}
 	my $idx = 0;
-	my $len = scalar @$ary;
 
-	Iterator::Simple::Iterator->new(sub {
-		return if($idx == $len);
+	iterator {
+		return if $idx == @$ary;
 		return $ary->[$idx++];
-	});
+	};
 }
 
 # class Iterator::Simple::Iterator is underlying Iterator object.
@@ -336,7 +378,7 @@ sub iarray {
 		bless $_[1], $_[0];
 	}
 
-	sub next { $_[0]->() }
+	sub next { goto shift }
 
 	sub __iter__ { $_[0] }
 
@@ -471,48 +513,59 @@ You can iterate it in several ways:
 
 =item is_iterator($object)
 
-If C<$object> is iterator created by Iterator::Simple, returns true.
+If C<$object> is an iterator created by Iterator::Simple, returns true.
 False otherwise.
 
 =item iter($object)
 
 This function auto detects what $object is, and automatically
-turns it into an iterator. Auto detection and iterator creation are
-as follows:
+turns it into an iterator. Supported objects are:
 
 =over 2
 
 =item *
 
-Just return C<$object> if it is an iterator.
+Iterator made with Iterator::Simple.
 
 =item *
 
-If C<$object> implements C<__iter__> method, call it and return the result.
+Object that implements C<__iter__> method.
 
 =item *
 
-C<$object> overloads '<>' or has C<next> method, creates an iterator
-which calls it.
+Object that overloads '<>' or has C<next> method.
 
 =item *
 
-If C<$object> is a array reference, returns C<iarray($object)>.
+Object that overloads '&{}'.(as iterator function.)
 
 =item *
 
-If C<$object> is a code reference, assume it is an iterator function.
+Object that overloads '@{}'.(with C<iarray()>)
 
 =item *
 
-If C<$object> is a GLOB reference, returns iterator which calls
-<$object> in scalar context in turn.
+ARRAY reference. (C<iarray()>)
 
 =item *
 
-Croak. C<$object> is not iterable.
+CODE reference. (as iterator function.)
+
+=item *
+
+GLOB reference.
+
+=item *
+
+nothing (C<iter()>.) (empty iterator.)
 
 =back
+
+If it fails to convert, runtime error.
+
+=item is_iterable($object)
+
+return true if C<$object> can be converted with C<iter($object)>
 
 =item list($object)
 
@@ -522,35 +575,35 @@ This fuction converts C<$object> into single array referece.
 
 =item *
 
-If C<$object> is an iterator, iterator it until it is exhausted.
+ARRAY reference.
 
 =item *
 
-Just return C<$object> if it is array reference.
+GLOB reference.
 
 =item *
 
-For GLOB reference, evaluate it in list context, and returns its reference.
+Iterator made with Iterator::Simple.
 
 =item *
 
-If C<$object> overloads '@{}' operator, call it.
+Object that overloads '@{}' operator.
 
 =item *
 
-If C<$object> implements '__iter__' method, get iterator from it, and
-iterate it until it is exhausted.
+Object that implements '__iter__' method.
 
 =item *
 
-If C<$object> overloads '<>' operator or has C<next> method, make an array by 
-calling that method until it returns undef.
+Object that overloads '<>' operator or has C<next> method.
 
 =item *
 
-Croak. C<$object> could not be convert to array.
+nothing (i.e. list() returns []);
 
 =back
+
+If it fails to convert, runtime error.
 
 Note that after C<list($iterator)>, that iterator is not usable any more.
 

@@ -1,4 +1,4 @@
-use Test::More qw(no_plan);
+use Test::More tests => 8;
 
 use strict;
 use warnings;
@@ -32,13 +32,19 @@ use Iterator::Simple qw(list iterator);
 	my $bar = Bar->new();
 	is_deeply list($bar) , [0,1,2,3], 'list(__iter__ implemented)';
 }
+
 {
 	my $baz = Baz->new();
 	is_deeply list($baz) , [0,1,2,3,4,5], 'list(<> overloaded)';
 }
+
 {
 	my $fiz = Fiz->new();
 	is_deeply list($fiz) , [0,1,2,3,4,5,6,7], 'list(next implemented)';
+}
+
+{
+	is_deeply list(), [], 'list()';
 }
 
 {

@@ -1,5 +1,11 @@
 Revision history for Perl extension Iterator::Simple
 
+0.04  Wed Jul 25 2007
+    - In iarray(), Do not fix the length of array.(No performance hit)
+    - Don't UNIVERSAL::can() as a function.
+	- list() and iter() rewritten.
+	- is_iterable() added.
+
 0.03  Tue Jun 12 09:44:12 2007
     - Documentation fix
 

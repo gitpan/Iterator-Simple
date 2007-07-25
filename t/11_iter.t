@@ -1,4 +1,4 @@
-use Test::More tests => 12;
+use Test::More tests => 14;
 
 use strict;
 use warnings;
@@ -50,6 +50,12 @@ my $itr;
 	my $foo = sub { shift @array; };
 	ok(($itr = iter($foo)), 'code ref iter creation');
 	is_deeply list($itr) => ['a', 'b', 'c'] , 'code ref iter result';
+}
+
+#13-14 iter()
+{
+	ok(($itr = eval{iter()}), 'empty iter creation');
+	is_deeply list($itr) => [], 'empty iter result';
 }
 
 {

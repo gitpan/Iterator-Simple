@@ -1,4 +1,4 @@
-use Test::More qw(no_plan);
+use Test::More tests => 7;
 
 use strict;
 use warnings;
@@ -9,10 +9,16 @@ my $itr;
 
 {
 	$_ = 'DUMMY';
+	
+	list(igrep { $_ % 5 } [1..20]);
+	
+	is($_, 'DUMMY', 'preserve $_ value after igrep');
 
-	$itr = iter [1 .. 20];
-	$itr = imap { $_ + 2 } igrep { $_ % 5 } $itr;
-	$itr = ifilter $itr, sub {
+	list(imap { $_ + 2 } [1..20]);
+
+	is($_, 'DUMMY', 'preserve $_ value after imap');
+
+	$itr = ifilter [1 .. 20], sub {
 		if($_ % 5 == 0) {
 			return iter([1 .. $_]); #inflate
 		}
@@ -24,16 +30,24 @@ my $itr;
 		}
 	};
 
-	$itr = ichain $itr, ['foo', 'bar', 'baz'];
-	$itr = ienumerate($itr);
+	list($itr);
 
-	$itr = islice($itr, 3, 20, 2);
+	is($_, 'DUMMY', 'preserve $_ value after ifilter');
 
-	my(@res, $rv);
-	while(defined($rv = $itr->())){
-		push @res, $rv;
-	}
+	list(izip(['dogs', 'cats', 'pigs'], ['bowow','mew','oink']));
 
-	is($_, 'DUMMY', 'preserve $_ value');
+	is($_, 'DUMMY', 'preserve $_ value after izip');
+
+	list(ichain ['blah', 'bla', 'bl'], ['foo', 'bar', 'baz']);
+
+	is($_, 'DUMMY', 'preserve $_ value after ichain');
+
+	list(ienumerate(['foo','bar','baz']));
+
+	is($_, 'DUMMY', 'preserve $_ value after ienumerate');
+
+	list(islice([1..100], 3, 20, 2));
+
+	is($_, 'DUMMY', 'preserve $_ value after islice');
 }
 
