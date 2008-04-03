@@ -10,7 +10,7 @@ use base qw(Exporter);
 use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS);
 
 use constant ITERATOR_CLASS => 'Iterator::Simple::Iterator';
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 $EXPORT_TAGS{basic} = [qw(iterator iter list is_iterator)];
 $EXPORT_TAGS{utils} = [qw(
@@ -153,7 +153,7 @@ sub list {
 sub ifilter {
 	my($src, $code) = @_;
 	$src = iter($src);
-	if(ref($code) ne 'CODE' or overload::Method($code, '&{}')) {
+	if(ref($code) ne 'CODE' and ! overload::Method($code, '&{}')) {
 		croak 'Second argument to ifilter must be callable.';
 	}
 
@@ -681,7 +681,7 @@ Accepts one or more iterables, returns an iterator like:
   $animals = iter(['dogs', 'cats', 'pigs']);
   $says = iter(['bowwow', 'mew', 'oink']);
   
-  $zipped = izip($i1, $2);
+  $zipped = izip($animals, $says);
   
   # yields ['dogs','bowwow'], ['cats','mew'], ['pigs', 'oink'].
 

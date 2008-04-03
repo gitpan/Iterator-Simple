@@ -1,4 +1,4 @@
-use Test::More tests=>3;
+use Test::More tests=>5;
 
 use strict;
 use warnings;
@@ -34,3 +34,20 @@ my $itr;
 	is_deeply list($itr) => [11,12,'S','T','R',14, 2, 'foo', 13], 'ifilter result';
 }
 
+{
+  $itr = [ 1, 2, 3 ];
+  eval { 
+    $itr = ifilter $itr, bless({ code => sub { $_ + 1 } } => 'ifiltertest');
+  };
+  is($@, '', 'ifilter creation');
+  is_deeply list($itr) => [ 2, 3, 4 ], 'ifilter result';
+}
+
+package ifiltertest;
+
+use overload (
+  '&{}' => '_call',
+  fallback => 1,
+);
+
+sub _call { shift->{code} }
